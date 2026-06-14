@@ -713,9 +713,12 @@ export class Chart {
     // the last value when idle and slides to the crosshair point on hover.
     //
     // pinLastValue = true: the colored pill stays pinned at the last value (so
-    // the "final" readout never disappears), and a neutral pill rides the
-    // crosshair showing the snapped value under the cursor — one per series.
+    // the "final" readout never disappears), and the live value under the
+    // crosshair is shown per `crosshair.valueLabel` — floating beside each
+    // marker ('marker'), docked on the value axis ('axis'), or legend-only
+    // ('none').
     const pin = o.crosshair.pinLastValue;
+    const valueLabel = o.crosshair.valueLabel;
     for (const s of this.series) {
       if (!s.visible || s.data.length === 0) continue;
       const fmt = s.valueFormat ?? o.valueAxis.format;
@@ -727,11 +730,16 @@ export class Chart {
       // when idle).
       this.legend?.setValue(s.id, fmt(snapP.value));
 
-      // Marker dot on the line at the snapped point.
-      if (hovering && s.crosshairMarkerVisible) {
+      // Crosshair marker dot, and — in 'marker' mode — a value pill that floats
+      // beside it and rides the crosshair across the canvas.
+      if (hovering) {
+        const mx = rc.timeToX(snapP.time);
         const my = rc.valueToY(snapP.value);
-        if (my >= plot.top - PILL_H && my <= plot.bottom + PILL_H) {
-          this.drawMarker(ctx, rc.timeToX(snapP.time), my, s.markerColorAt(snapIdx));
+        const onPlot = my >= plot.top - PILL_H && my <= plot.bottom + PILL_H;
+        const mc = s.markerColorAt(snapIdx);
+        if (s.crosshairMarkerVisible && onPlot) this.drawMarker(ctx, mx, my, mc);
+        if (pin && valueLabel === 'marker' && onPlot) {
+          this.drawFloatingPill(ctx, mx, my, fmt(snapP.value), mc, contrastText(mc));
         }
       }
 
@@ -747,9 +755,9 @@ export class Chart {
         }
       }
 
-      // pinLastValue: a neutral pill rides the crosshair at this series' snapped
-      // value, so the live readout stays on the axis without hiding the final.
-      if (pin && hovering) {
+      // 'axis' mode: a neutral crosshair pill docked on the value axis at the
+      // snapped value.
+      if (pin && hovering && valueLabel === 'axis') {
         const sy = rc.valueToY(snapP.value);
         if (sy >= plot.top - PILL_H && sy <= plot.bottom + PILL_H) {
           this.drawPill(
@@ -763,8 +771,7 @@ export class Chart {
     }
 
     if (hovering && snapTime != null) {
-      // Legacy: a single neutral pill at the cursor's Y. (In pinLastValue mode
-      // the per-series neutral pills above already report the crosshair values.)
+      // Legacy: a single neutral pill at the cursor's Y.
       if (!pin) {
         const cy = clamp(this.hover.y, plot.top, plot.bottom);
         const cv = this.yToValue(cy);
@@ -840,6 +847,37 @@ export class Chart {
       ctx.fillText(segments[i].text, x + w / 2, y + PILL_H / 2 + 0.5);
       x += w;
     }
+  }
+
+  /**
+   * A single value pill that floats next to the crosshair marker at (mx, my)
+   * and rides the crosshair. Drawn on the cheap overlay layer (redrawn per
+   * pointer move), so this is essentially free. Prefers the right of the marker
+   * and flips to the left when it would overflow the plot's right edge.
+   */
+  private drawFloatingPill(
+    ctx: CanvasRenderingContext2D,
+    mx: number,
+    my: number,
+    text: string,
+    bg: string,
+    fg: string,
+  ): void {
+    const plot = this.rc!.plot;
+    const padX = 6;
+    const w = Math.ceil(ctx.measureText(text).width) + padX * 2;
+    const gap = this.options.crosshair.markerRadius + 6;
+    let x = mx + gap;
+    if (x + w > plot.right) x = mx - gap - w;
+    x = clamp(x, plot.left + 1, Math.max(plot.left + 1, plot.right - w - 1));
+    const y = clamp(Math.round(my - PILL_H / 2), plot.top + 1, plot.bottom - PILL_H - 1);
+    roundRectPath(ctx, x, y, w, PILL_H, 3);
+    ctx.fillStyle = bg;
+    ctx.fill();
+    ctx.fillStyle = fg;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x + w / 2, y + PILL_H / 2 + 0.5);
   }
 
   private drawTimePill(ctx: CanvasRenderingContext2D, cx: number, text: string): void {

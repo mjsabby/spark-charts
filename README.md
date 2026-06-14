@@ -15,11 +15,13 @@ decades.
   frame.
 - **Crosshair / trace** — vertical + horizontal lines, a snapped marker dot per
   series, a date readout pill on the time axis, and live values pushed into the
-  legend. By default each series' colored pill stays **pinned at its last
-  value** while you hover (so the final readout never disappears) and a neutral
-  pill rides the crosshair with the value under the cursor; set
+  legend. Each series' colored pill stays **pinned at its last value** while you
+  hover (so the final readout never disappears), and the live value under the
+  crosshair rides along beside its marker — `crosshair.valueLabel` picks
+  `'marker'` (default, floats next to the marker), `'axis'` (a neutral pill
+  docked on the value axis), or `'none'` (legend only). Set
   `crosshair.pinLastValue: false` for the older behaviour where the colored pill
-  follows the crosshair.
+  itself follows the crosshair.
 - **Series types** — `LineSeries` (with optional gradient **area** fill) and
   `HistogramSeries` (sign-coloured bars / sticks). Dense data is decimated to a
   min/max envelope per pixel column, so a 20-year daily series stays cheap to

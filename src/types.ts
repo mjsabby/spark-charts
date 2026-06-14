@@ -108,6 +108,15 @@ export interface CrosshairOptions {
    * pill tracks the cursor's Y on the axis (the older behaviour).
    */
   pinLastValue: boolean;
+  /**
+   * Where the live value under the crosshair is shown while hovering (only
+   * applies when `pinLastValue` is true):
+   * - `'marker'` — a colored pill floats next to each series' crosshair marker
+   *   and rides the crosshair across the canvas (default);
+   * - `'axis'` — a neutral pill is docked on the value axis at the snapped value;
+   * - `'none'` — the value is shown only in the legend.
+   */
+  valueLabel: 'marker' | 'axis' | 'none';
   horizontalLine: boolean;
   verticalLine: boolean;
   color: string;

@@ -54,6 +54,7 @@ export const DEFAULT_OPTIONS: ChartOptions = {
     visible: true,
     snap: true,
     pinLastValue: true,
+    valueLabel: 'marker',
     horizontalLine: true,
     verticalLine: true,
     color: '#7e8ca3',
