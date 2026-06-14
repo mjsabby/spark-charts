@@ -707,41 +707,74 @@ export class Chart {
       ctx.restore();
     }
 
-    // Per-series value pills (+ markers when hovering). Shown at the cursor
-    // when hovering, otherwise at the last point.
+    // Per-series pills (+ markers when hovering).
+    //
+    // Legacy (pinLastValue = false): one colored pill per series that sits at
+    // the last value when idle and slides to the crosshair point on hover.
+    //
+    // pinLastValue = true: the colored pill stays pinned at the last value (so
+    // the "final" readout never disappears), and a neutral pill rides the
+    // crosshair showing the snapped value under the cursor — one per series.
+    const pin = o.crosshair.pinLastValue;
     for (const s of this.series) {
-      if (!s.visible) continue;
-      if (!hovering && !s.lastValueVisible) continue;
-      let idx: number;
-      if (hovering && snapTime != null) idx = s.nearestIndex(snapTime);
-      else idx = s.data.length - 1;
-      const p = s.data[idx];
-      if (!p) continue;
-      const y = rc.valueToY(p.value);
-      const valTxt = (s.valueFormat ?? o.valueAxis.format)(p.value);
-      this.legend?.setValue(s.id, valTxt);
-      if (y < plot.top - PILL_H || y > plot.bottom + PILL_H) continue;
+      if (!s.visible || s.data.length === 0) continue;
+      const fmt = s.valueFormat ?? o.valueAxis.format;
+      const lastP = s.data[s.data.length - 1];
+      const snapIdx = hovering && snapTime != null ? s.nearestIndex(snapTime) : s.data.length - 1;
+      const snapP = s.data[snapIdx];
 
+      // The legend mirrors the value under the crosshair (or the last value
+      // when idle).
+      this.legend?.setValue(s.id, fmt(snapP.value));
+
+      // Marker dot on the line at the snapped point.
       if (hovering && s.crosshairMarkerVisible) {
-        this.drawMarker(ctx, rc.timeToX(p.time), y, s.markerColorAt(idx));
+        const my = rc.valueToY(snapP.value);
+        if (my >= plot.top - PILL_H && my <= plot.bottom + PILL_H) {
+          this.drawMarker(ctx, rc.timeToX(snapP.time), my, s.markerColorAt(snapIdx));
+        }
       }
-      if (s.lastValueVisible || hovering) {
-        const fg = contrastText(s.color);
-        const text = s.lastValueTitleVisible ? `${s.title}  ${valTxt}` : valTxt;
-        this.drawPill(ctx, y, [{ text, bg: s.color, fg }], o.valueAxis.side);
+
+      // Colored value pill: pinned at the last value (pinLastValue) or following
+      // the crosshair (legacy).
+      const coloredP = pin ? lastP : snapP;
+      if (s.lastValueVisible || (!pin && hovering)) {
+        const cy = rc.valueToY(coloredP.value);
+        if (cy >= plot.top - PILL_H && cy <= plot.bottom + PILL_H) {
+          const valTxt = fmt(coloredP.value);
+          const text = s.lastValueTitleVisible ? `${s.title}  ${valTxt}` : valTxt;
+          this.drawPill(ctx, cy, [{ text, bg: s.color, fg: contrastText(s.color) }], o.valueAxis.side);
+        }
+      }
+
+      // pinLastValue: a neutral pill rides the crosshair at this series' snapped
+      // value, so the live readout stays on the axis without hiding the final.
+      if (pin && hovering) {
+        const sy = rc.valueToY(snapP.value);
+        if (sy >= plot.top - PILL_H && sy <= plot.bottom + PILL_H) {
+          this.drawPill(
+            ctx,
+            sy,
+            [{ text: fmt(snapP.value), bg: o.crosshair.labelBackground, fg: o.crosshair.labelColor }],
+            o.valueAxis.side,
+          );
+        }
       }
     }
 
     if (hovering && snapTime != null) {
-      // Crosshair value pill at the cursor's Y.
-      const cy = clamp(this.hover.y, plot.top, plot.bottom);
-      const cv = this.yToValue(cy);
-      this.drawPill(
-        ctx,
-        cy,
-        [{ text: o.valueAxis.format(cv), bg: o.crosshair.labelBackground, fg: o.crosshair.labelColor }],
-        o.valueAxis.side,
-      );
+      // Legacy: a single neutral pill at the cursor's Y. (In pinLastValue mode
+      // the per-series neutral pills above already report the crosshair values.)
+      if (!pin) {
+        const cy = clamp(this.hover.y, plot.top, plot.bottom);
+        const cv = this.yToValue(cy);
+        this.drawPill(
+          ctx,
+          cy,
+          [{ text: o.valueAxis.format(cv), bg: o.crosshair.labelBackground, fg: o.crosshair.labelColor }],
+          o.valueAxis.side,
+        );
+      }
       // Date readout at the bottom.
       const label = o.timeAxis.crosshairFormat
         ? o.timeAxis.crosshairFormat(snapTime)

@@ -99,6 +99,15 @@ export interface CrosshairOptions {
   visible: boolean;
   /** Snap the vertical line to the nearest data point of the densest series. */
   snap: boolean;
+  /**
+   * Keep each series' colored value pill pinned at its **last** value while
+   * hovering, instead of sliding it to the crosshair — so the "final" readout
+   * never disappears. The live value under the crosshair is shown by a neutral
+   * pill that rides the crosshair (one per visible series) plus the legend.
+   * When `false`, the colored pill follows the crosshair and a single neutral
+   * pill tracks the cursor's Y on the axis (the older behaviour).
+   */
+  pinLastValue: boolean;
   horizontalLine: boolean;
   verticalLine: boolean;
   color: string;
