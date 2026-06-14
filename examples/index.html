@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>spark-charts — demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        background: #0a121f;
+        color: #d7e0ec;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+          sans-serif;
+      }
+      .wrap {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 24px 20px 64px;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .sub {
+        color: #6f7e93;
+        font-size: 13px;
+        margin: 0 0 24px;
+      }
+      .hint {
+        color: #6f7e93;
+        font-size: 12px;
+        margin: 0 0 24px;
+      }
+      .hint kbd {
+        background: #16223a;
+        border: 1px solid #2a3a55;
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-size: 11px;
+      }
+      .chart {
+        width: 100%;
+        height: 360px;
+        border: 1px solid #1b2740;
+        border-radius: 10px;
+        margin-bottom: 22px;
+        background: #0e1827;
+      }
+      #chart2 {
+        height: 460px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>spark-charts</h1>
+      <p class="sub">A small canvas charting library — crosshair, area fills, thresholds, pan/zoom, smart date axis.</p>
+      <p class="hint">
+        <strong>Move</strong> the pointer to trace · <strong>drag</strong> to pan ·
+        <strong>scroll</strong> to zoom · <strong>double-click</strong> to reset ·
+        click legend chips to toggle series. Time axis: <kbd>UTC</kbd>.
+      </p>
+
+      <div id="chart1" class="chart"></div>
+      <div id="chart2" class="chart"></div>
+      <div id="chart3" class="chart"></div>
+      <div id="chart4" class="chart"></div>
+      <div id="chart5" class="chart"></div>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
