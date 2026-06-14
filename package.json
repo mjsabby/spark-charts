@@ -1,6 +1,6 @@
 {
   "name": "spark-charts",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "A lightweight canvas charting library for time-series: crosshair, area fills, threshold lines, pan/zoom, smart date axis, add/remove series.",
   "type": "module",
   "main": "dist/index.js",

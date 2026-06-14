@@ -707,41 +707,81 @@ export class Chart {
       ctx.restore();
     }
 
-    // Per-series value pills (+ markers when hovering). Shown at the cursor
-    // when hovering, otherwise at the last point.
+    // Per-series pills (+ markers when hovering).
+    //
+    // Legacy (pinLastValue = false): one colored pill per series that sits at
+    // the last value when idle and slides to the crosshair point on hover.
+    //
+    // pinLastValue = true: the colored pill stays pinned at the last value (so
+    // the "final" readout never disappears), and the live value under the
+    // crosshair is shown per `crosshair.valueLabel` — floating beside each
+    // marker ('marker'), docked on the value axis ('axis'), or legend-only
+    // ('none').
+    const pin = o.crosshair.pinLastValue;
+    const valueLabel = o.crosshair.valueLabel;
     for (const s of this.series) {
-      if (!s.visible) continue;
-      if (!hovering && !s.lastValueVisible) continue;
-      let idx: number;
-      if (hovering && snapTime != null) idx = s.nearestIndex(snapTime);
-      else idx = s.data.length - 1;
-      const p = s.data[idx];
-      if (!p) continue;
-      const y = rc.valueToY(p.value);
-      const valTxt = (s.valueFormat ?? o.valueAxis.format)(p.value);
-      this.legend?.setValue(s.id, valTxt);
-      if (y < plot.top - PILL_H || y > plot.bottom + PILL_H) continue;
+      if (!s.visible || s.data.length === 0) continue;
+      const fmt = s.valueFormat ?? o.valueAxis.format;
+      const lastP = s.data[s.data.length - 1];
+      const snapIdx = hovering && snapTime != null ? s.nearestIndex(snapTime) : s.data.length - 1;
+      const snapP = s.data[snapIdx];
 
-      if (hovering && s.crosshairMarkerVisible) {
-        this.drawMarker(ctx, rc.timeToX(p.time), y, s.markerColorAt(idx));
+      // The legend mirrors the value under the crosshair (or the last value
+      // when idle).
+      this.legend?.setValue(s.id, fmt(snapP.value));
+
+      // Crosshair marker dot, and — in 'marker' mode — a value pill that floats
+      // beside it and rides the crosshair across the canvas.
+      if (hovering) {
+        const mx = rc.timeToX(snapP.time);
+        const my = rc.valueToY(snapP.value);
+        const onPlot = my >= plot.top - PILL_H && my <= plot.bottom + PILL_H;
+        const mc = s.markerColorAt(snapIdx);
+        if (s.crosshairMarkerVisible && onPlot) this.drawMarker(ctx, mx, my, mc);
+        if (pin && valueLabel === 'marker' && onPlot) {
+          this.drawFloatingPill(ctx, mx, my, fmt(snapP.value), mc, contrastText(mc));
+        }
       }
-      if (s.lastValueVisible || hovering) {
-        const fg = contrastText(s.color);
-        const text = s.lastValueTitleVisible ? `${s.title}  ${valTxt}` : valTxt;
-        this.drawPill(ctx, y, [{ text, bg: s.color, fg }], o.valueAxis.side);
+
+      // Colored value pill: pinned at the last value (pinLastValue) or following
+      // the crosshair (legacy).
+      const coloredP = pin ? lastP : snapP;
+      if (s.lastValueVisible || (!pin && hovering)) {
+        const cy = rc.valueToY(coloredP.value);
+        if (cy >= plot.top - PILL_H && cy <= plot.bottom + PILL_H) {
+          const valTxt = fmt(coloredP.value);
+          const text = s.lastValueTitleVisible ? `${s.title}  ${valTxt}` : valTxt;
+          this.drawPill(ctx, cy, [{ text, bg: s.color, fg: contrastText(s.color) }], o.valueAxis.side);
+        }
+      }
+
+      // 'axis' mode: a neutral crosshair pill docked on the value axis at the
+      // snapped value.
+      if (pin && hovering && valueLabel === 'axis') {
+        const sy = rc.valueToY(snapP.value);
+        if (sy >= plot.top - PILL_H && sy <= plot.bottom + PILL_H) {
+          this.drawPill(
+            ctx,
+            sy,
+            [{ text: fmt(snapP.value), bg: o.crosshair.labelBackground, fg: o.crosshair.labelColor }],
+            o.valueAxis.side,
+          );
+        }
       }
     }
 
     if (hovering && snapTime != null) {
-      // Crosshair value pill at the cursor's Y.
-      const cy = clamp(this.hover.y, plot.top, plot.bottom);
-      const cv = this.yToValue(cy);
-      this.drawPill(
-        ctx,
-        cy,
-        [{ text: o.valueAxis.format(cv), bg: o.crosshair.labelBackground, fg: o.crosshair.labelColor }],
-        o.valueAxis.side,
-      );
+      // Legacy: a single neutral pill at the cursor's Y.
+      if (!pin) {
+        const cy = clamp(this.hover.y, plot.top, plot.bottom);
+        const cv = this.yToValue(cy);
+        this.drawPill(
+          ctx,
+          cy,
+          [{ text: o.valueAxis.format(cv), bg: o.crosshair.labelBackground, fg: o.crosshair.labelColor }],
+          o.valueAxis.side,
+        );
+      }
       // Date readout at the bottom.
       const label = o.timeAxis.crosshairFormat
         ? o.timeAxis.crosshairFormat(snapTime)
@@ -807,6 +847,37 @@ export class Chart {
       ctx.fillText(segments[i].text, x + w / 2, y + PILL_H / 2 + 0.5);
       x += w;
     }
+  }
+
+  /**
+   * A single value pill that floats next to the crosshair marker at (mx, my)
+   * and rides the crosshair. Drawn on the cheap overlay layer (redrawn per
+   * pointer move), so this is essentially free. Prefers the right of the marker
+   * and flips to the left when it would overflow the plot's right edge.
+   */
+  private drawFloatingPill(
+    ctx: CanvasRenderingContext2D,
+    mx: number,
+    my: number,
+    text: string,
+    bg: string,
+    fg: string,
+  ): void {
+    const plot = this.rc!.plot;
+    const padX = 6;
+    const w = Math.ceil(ctx.measureText(text).width) + padX * 2;
+    const gap = this.options.crosshair.markerRadius + 6;
+    let x = mx + gap;
+    if (x + w > plot.right) x = mx - gap - w;
+    x = clamp(x, plot.left + 1, Math.max(plot.left + 1, plot.right - w - 1));
+    const y = clamp(Math.round(my - PILL_H / 2), plot.top + 1, plot.bottom - PILL_H - 1);
+    roundRectPath(ctx, x, y, w, PILL_H, 3);
+    ctx.fillStyle = bg;
+    ctx.fill();
+    ctx.fillStyle = fg;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x + w / 2, y + PILL_H / 2 + 0.5);
   }
 
   private drawTimePill(ctx: CanvasRenderingContext2D, cx: number, text: string): void {
